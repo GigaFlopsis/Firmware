@@ -65,6 +65,8 @@ Standard::Standard(VtolAttitudeControl *attc) :
 	_params_handles_standard.pitch_setpoint_offset = param_find("FW_PSP_OFF");
 	_params_handles_standard.reverse_output = param_find("VT_B_REV_OUT");
 	_params_handles_standard.reverse_delay = param_find("VT_B_REV_DEL");
+    _params_handles_standard.reverse_yaw = param_find("VT_MC_REV_YAW");
+
 }
 
 void
@@ -94,6 +96,10 @@ Standard::parameters_update()
 	param_get(_params_handles_standard.reverse_delay, &v);
 	_params_standard.reverse_delay = math::constrain(v, 0.0f, 10.0f);
 
+	int i;
+    param_get(_params_handles_standard.reverse_yaw, &i);
+    _params_standard.reverse_yaw = math::constrain(i, -1,1);
+
 }
 
 void Standard::update_vtol_state()
@@ -105,6 +111,8 @@ void Standard::update_vtol_state()
 
 	float mc_weight = _mc_roll_weight;
 	float time_since_trans_start = (float)(hrt_absolute_time() - _vtol_schedule.transition_start) * 1e-6f;
+
+	// get direction of propellers
 
 	if (!_attc->is_fixed_wing_requested()) {
 
@@ -349,7 +357,7 @@ void Standard::fill_actuator_outputs()
 		_actuators_mc_in->control[actuator_controls_s::INDEX_PITCH] * _mc_pitch_weight;
 	// yaw
 	_actuators_out_0->control[actuator_controls_s::INDEX_YAW] =
-		_actuators_mc_in->control[actuator_controls_s::INDEX_YAW] * _mc_yaw_weight;
+		_actuators_mc_in->control[actuator_controls_s::INDEX_YAW] * _mc_yaw_weight * _params_standard.reverse_yaw;
 	// throttle
 	_actuators_out_0->control[actuator_controls_s::INDEX_THROTTLE] =
 		_actuators_mc_in->control[actuator_controls_s::INDEX_THROTTLE] * _mc_throttle_weight;

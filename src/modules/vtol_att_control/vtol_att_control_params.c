@@ -343,6 +343,7 @@ PARAM_DEFINE_FLOAT(VT_B_DEC_FF, 0.12f);
  */
 PARAM_DEFINE_FLOAT(VT_B_DEC_I, 0.1f);
 
+
 /**
  * Enable the usage of AUX outputs for hover motors.
  *
@@ -354,3 +355,19 @@ PARAM_DEFINE_FLOAT(VT_B_DEC_I, 0.1f);
  * @group VTOL Attitude Control
  */
 PARAM_DEFINE_INT32(VT_MC_ON_FMU, 0);
+
+
+/**
+ * Params for change rotation of propellers
+ *
+ *
+ * Set to 1 for normal rotate (default).
+ * Set to-1 for revers rotate.
+ *
+ * @min -1
+ * @max 1
+ * @decimal 0
+ * @group VTOL Attitude Control
+ */
+PARAM_DEFINE_INT32(VT_MC_REV_YAW, 1);
+
