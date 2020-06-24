@@ -1,0 +1,148 @@
+#!/bin/sh
+#
+# @name Innopolis VTOL
+#
+# @type Standard VTOL
+# @class VTOL
+#
+# @maintainer Roman Fedorenko <r.fedorenko@innopolis.ru>
+#
+# @output MAIN1 motor 1
+# @output MAIN2 motor 2
+# @output MAIN3 motor 3
+# @output MAIN4 motor 4
+# @output AUX1 Aileron 1
+# @output AUX2 Aileron 2
+# @output AUX3 Elevator
+# @output AUX4 Rudder
+# @output AUX5 Throttle
+#
+
+sh /etc/init.d/rc.vtol_defaults
+
+if [ $AUTOCNF = yes ]
+then
+	param set PWM_AUX_DIS5 950
+
+	param set PWM_RATE 400
+	
+	# MC
+	param set MC_ROLL_P 6
+	param set MC_ROLLRATE_P 0.12
+	param set MC_ROLLRATE_I 0.15
+	param set MC_ROLLRATE_D 0.002
+	param set MC_ROLLRATE_MAX 100
+	param set MC_ROLLRATE_FF 0
+	param set MC_RR_INT_LIM 0.1
+
+	param set MC_PITCH_P 6
+	param set MC_PITCHRATE_P 0.12
+	param set MC_PITCHRATE_I 0.15
+	param set MC_PITCHRATE_D 0.002
+	param set MC_PITCHRATE_MAX 100
+	param set MC_PITCHRATE_FF 0
+	param set MC_PR_INT_LIM 0.1
+
+	param set MC_YAW_P 2.8
+	param set MC_YAWRATE_P 0.22
+	param set MC_YAWRATE_I 0.02
+	param set MC_YAWRATE_D 0
+	param set MC_YR_INT_LIM 0.1
+	param set MC_YAWRATE_FF 0
+	param set MC_YAWRATE_MAX 40
+	param set MPC_YAWRAUTO_MAX 40
+
+	# FW
+	param set FW_AIRSPD_MAX 35
+	param set FW_AIRSPD_MIN 23
+	param set FW_AIRSPD_TRIM 25
+	param set FW_PSP_OFF 5
+	param set FW_P_LIM_MAX 20
+	param set FW_P_LIM_MIN -20
+	param set FW_P_RMAX_NEG 50
+	param set FW_P_RMAX_POS 50
+
+	param set FW_PR_FF 0.5
+	param set FW_PR_I 0.02
+	param set FW_PR_IMAX 0.4
+	param set FW_PR_P 0.08
+	param set FW_RR_FF 0.6
+	param set FW_RR_I 0.01
+	param set FW_RR_IMAX 0.2
+	param set FW_RR_P 0.05
+	param set FW_THR_CRUISE 0.75
+
+	# VT
+	param set VT_ARSP_BLEND 9
+	param set VT_ARSP_TRANS 25
+	param set VT_F_TRANS_THR 0.85
+	param set VT_B_DEC_MSS 1
+	param set VT_B_TRANS_DUR 10
+	param set VT_ELEV_MC_LOCK 0
+	param set VT_FWD_THRUST_SC 0
+	param set VT_F_TRANS_DUR 10
+	param set VT_TRANS_MIN_TM 7
+	param set VT_TRANS_TIMEOUT 12
+	param set VT_MC_REV_YAW -1
+	
+
+	param set VT_MOT_ID 1234
+	param set VT_FW_MOT_OFFID 1234
+	param set VT_IDLE_PWM_MC 1080
+	param set VT_TYPE 2
+	
+	# MPC
+	param set MPC_MAN_TILT_MAX 20
+	param set MPC_TILTMAX_AIR 20
+	param set MPC_ACC_HOR_MAX 4
+	param set MPC_VEL_MANUAL 7
+	param set MPC_XY_VEL_MAX 7
+
+
+	# BATTERY
+	param set BAT_A_PER_V 157.89
+	param set BAT_V_DIV 21
+	param set BAT_N_CELLS 12
+	param set BAT_V_CHARGED 4.35
+	param set BAT_V_EMPTY 3.7
+	param set BAT_LOW_THR 0.3
+
+	# UAVCAN
+	param set UAVCAN_ENABLE 3
+	param set COM_ARM_CHK_ESCS 0
+
+	# CIRCUIT BREAKER
+	param set CBRK_IO_SAFETY 22027
+
+	#SENSORS PARAMS
+	param set EKF2_GPS_POS_X -0.6
+	param set EKF2_GPS_POS_Z -0.12
+	param set EKF2_RNG_AID 1
+	param set EKF2_RNG_A_HMAX 10
+	param set SENS_EN_SF1XX 5
+	
+	#TELEMETRY
+	param set MAV_0_CONFIG 104
+	param set MAV_0_RATE 2880
+	param set MAV_1_CONFIG 102
+	param set MAV_1_MODE 7
+	param set MAV_1_RATE 2880
+	param set MAV_RADIO_ID 0
+	param set SER_TEL2_BAUD 57600
+	param set 
+	param set 
+
+fi
+
+set MAV_TYPE 22
+
+# set MIXER quad_x
+# set MIXER_AUX vtol_AAERT
+
+set MIXER inno_vtol_AAERT
+set PWM_OUT 1234
+
+set OUTPUT_MODE uavcan_esc
+set OUTPUT_AUX_DEV /dev/uavcan/esc
+
+
