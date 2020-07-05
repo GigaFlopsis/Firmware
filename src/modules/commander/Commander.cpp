@@ -1627,10 +1627,16 @@ Commander::run()
 			}
 
 			// Auto disarm after 5 seconds if kill switch is engaged
-			_auto_disarm_killed.set_state_and_update(armed.manual_lockdown, hrt_absolute_time());
+			_auto_disarm_killed.set_state_and_update(armed.manual_lockdown || armed.lockdown, hrt_absolute_time());
 
 			if (_auto_disarm_killed.get_state()) {
-				arm_disarm(false, true, &mavlink_log_pub, "Kill-switch still engaged, disarming");
+				if (armed.manual_lockdown) {
+					arm_disarm(false, true, &mavlink_log_pub, "Kill-switch still engaged, disarming");
+
+				} else {
+					arm_disarm(false, true, &mavlink_log_pub, "System in lockdown, disarming");
+				}
+
 			}
 
 		} else {
@@ -2145,18 +2151,33 @@ Commander::run()
 		    failure_detector_updated) {
 
 			if (_failure_detector.isFailure()) {
-				if ((hrt_elapsed_time(&_time_at_takeoff) < 3_s) &&
-				    !_lockdown_triggered) {
+
+				const hrt_abstime time_at_arm = armed.armed_time_ms * 1000;
+
+				if (hrt_elapsed_time(&time_at_arm) < 500_ms) {
+					// 500ms is the PWM spoolup time. Within this timeframe controllers are not affecting actuator_outputs
+
+					if (status.failure_detector_status & vehicle_status_s::FAILURE_ARM_ESC) {
+						arm_disarm(false, true, &mavlink_log_pub, "Failure detector");
+						_status_changed = true;
+						mavlink_log_critical(&mavlink_log_pub, "ESCs did not respond to arm request");
+					}
+
+				}
+
+				if (hrt_elapsed_time(&_time_at_takeoff) < (1_s * _param_com_lkdown_tko.get())) {
 					// This handles the case where something fails during the early takeoff phase
+					if (!_lockdown_triggered) {
 
-					armed.lockdown = true;
-					_lockdown_triggered = true;
-					_status_changed = true;
+						armed.lockdown = true;
+						_lockdown_triggered = true;
+						_status_changed = true;
 
-					mavlink_log_emergency(&mavlink_log_pub, "Critical failure detected: lockdown");
+						mavlink_log_emergency(&mavlink_log_pub, "Critical failure detected: lockdown");
+					}
 
 				} else if (!status_flags.circuit_breaker_flight_termination_disabled &&
-					   !_flight_termination_triggered) {
+					   !_flight_termination_triggered && !_lockdown_triggered) {
 
 					armed.force_failsafe = true;
 					_flight_termination_triggered = true;
