@@ -106,7 +106,11 @@ UavcanEscController::update_outputs(bool stop_motors, uint16_t outputs[MAX_ACTUA
 
 	for (unsigned i = 0; i < num_outputs; i++) {
 		if (stop_motors || outputs[i] == DISARMED_OUTPUT_VALUE) {
-			msg.cmd.push_back(static_cast<unsigned>(0));
+
+//		    @Dmitry Devitt
+//		    change disarm values for uavcan
+//		    msg.cmd.push_back(static_cast<unsigned>(0));
+		    msg.cmd.push_back(-1);
 
 		} else {
 			msg.cmd.push_back(static_cast<int>(outputs[i]));
