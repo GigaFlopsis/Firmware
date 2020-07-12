@@ -32,75 +32,75 @@
  ****************************************************************************/
 
 /**
- * @file ICM20948_AK09916.hpp
+ * @file lps33hw_spi.cpp
  *
- * Driver for the AKM AK09916 connected via I2C.
+ * SPI interface for LPS33HW
  *
+ * Note: the driver was not tested with SPI
  */
 
-#pragma once
+#include <lib/drivers/device/spi.h>
 
-#include "AKM_AK09916_registers.hpp"
-
-#include <drivers/drv_hrt.h>
-#include <lib/drivers/device/i2c.h>
-#include <lib/drivers/magnetometer/PX4Magnetometer.hpp>
-#include <lib/perf/perf_counter.h>
-#include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
-
-class ICM20948;
-
-namespace AKM_AK09916
+namespace lps33hw
 {
 
-class ICM20948_AK09916 : public px4::ScheduledWorkItem
+/* SPI protocol address bits */
+#define DIR_READ			(1<<7)
+#define DIR_WRITE			(0<<7)
+
+device::Device *LPS33HW_SPI_interface(uint8_t bus, uint32_t device, int bus_frequency, spi_mode_e spi_mode);
+
+class LPS33HW_SPI : public device::SPI
 {
 public:
-	ICM20948_AK09916(ICM20948 &icm20948, enum Rotation rotation = ROTATION_NONE);
-	~ICM20948_AK09916() override;
+	LPS33HW_SPI(uint8_t bus, uint32_t device, int bus_frequency, spi_mode_e spi_mode);
+	virtual ~LPS33HW_SPI() = default;
 
-	bool Reset();
-	void PrintInfo();
+	virtual int	read(unsigned address, void *data, unsigned count);
+	virtual int	write(unsigned address, void *data, unsigned count);
 
-private:
-
-	struct TransferBuffer {
-		uint8_t ST1;
-		uint8_t HXL;
-		uint8_t HXH;
-		uint8_t HYL;
-		uint8_t HYH;
-		uint8_t HZL;
-		uint8_t HZH;
-		uint8_t TMPS;
-		uint8_t ST2;
-	};
-
-	struct register_config_t {
-		AKM_AK09916::Register reg;
-		uint8_t set_bits{0};
-		uint8_t clear_bits{0};
-	};
-
-	void Run() override;
-
-	ICM20948 &_icm20948;
-
-	PX4Magnetometer _px4_mag;
-
-	perf_counter_t _bad_transfer_perf{perf_alloc(PC_COUNT, MODULE_NAME"_ak09916: bad transfer")};
-	perf_counter_t _magnetic_sensor_overflow_perf{perf_alloc(PC_COUNT, MODULE_NAME"_ak09916: magnetic sensor overflow")};
-
-	hrt_abstime _reset_timestamp{0};
-	hrt_abstime _last_config_check_timestamp{0};
-	unsigned _consecutive_failures{0};
-
-	enum class STATE : uint8_t {
-		RESET,
-		READ_WHO_AM_I,
-		WAIT_FOR_RESET,
-		READ,
-	} _state{STATE::RESET};
 };
 
-} // namespace AKM_AK09916
+device::Device *
+LPS33HW_SPI_interface(uint8_t bus, uint32_t device, int bus_frequency, spi_mode_e spi_mode)
+{
+	return new LPS33HW_SPI(bus, device, bus_frequency, spi_mode);
+}
+
+LPS33HW_SPI::LPS33HW_SPI(uint8_t bus, uint32_t device, int bus_frequency, spi_mode_e spi_mode) :
+	SPI(DRV_BARO_DEVTYPE_LPS33HW, MODULE_NAME, bus, device, spi_mode, bus_frequency)
+{
+}
+
+int
+LPS33HW_SPI::read(unsigned address, void *data, unsigned count)
+{
+	uint8_t buf[32];
+
+	if (sizeof(buf) < (count + 1)) {
+		return -EIO;
+	}
+
+	buf[0] = address | DIR_READ;
+
+	int ret = transfer(&buf[0], &buf[0], count + 1);
+	memcpy(data, &buf[1], count);
+	return ret;
+}
+
+int
+LPS33HW_SPI::write(unsigned address, void *data, unsigned count)
+{
+	uint8_t buf[32];
+
+	if (sizeof(buf) < (count + 1)) {
+		return -EIO;
+	}
+
+	buf[0] = address | DIR_WRITE;
+	memcpy(&buf[1], data, count);
+
+	return transfer(&buf[0], &buf[0], count + 1);
+}
+
+} // namespace lps33hw

@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2017 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,68 +31,84 @@
  *
  ****************************************************************************/
 
-#include "SDP3X.hpp"
+#include "lps33hw.hpp"
 
-extern "C" __EXPORT int sdp3x_airspeed_main(int argc, char *argv[]);
-
-I2CSPIDriverBase *SDP3X::instantiate(const BusCLIArguments &cli, const BusInstanceIterator &iterator,
-				     int runtime_instance)
+namespace lps33hw
 {
-	SDP3X *instance = new SDP3X(iterator.configuredBusOption(), iterator.bus(), cli.bus_frequency, cli.i2c_address,
-				    cli.custom1 == 1);
-
-	if (instance == nullptr) {
-		PX4_ERR("alloc failed");
-		return nullptr;
-	}
-
-	if (instance->init() != PX4_OK) {
-		delete instance;
-		return nullptr;
-	}
-
-	instance->start();
-	return instance;
+extern device::Device *LPS33HW_SPI_interface(uint8_t bus, uint32_t device, int bus_frequency, spi_mode_e spi_mode);
+extern device::Device *LPS33HW_I2C_interface(uint8_t bus, uint32_t device, int bus_frequency);
 }
 
+#include <px4_platform_common/getopt.h>
+#include <px4_platform_common/module.h>
+
+using namespace lps33hw;
 
 void
-SDP3X::print_usage()
+LPS33HW::print_usage()
 {
-	PRINT_MODULE_USAGE_NAME("sdp3x_airspeed", "driver");
-	PRINT_MODULE_USAGE_SUBCATEGORY("airspeed_sensor");
+	PRINT_MODULE_USAGE_NAME("lps33hw", "driver");
+	PRINT_MODULE_USAGE_SUBCATEGORY("baro");
 	PRINT_MODULE_USAGE_COMMAND("start");
-	PRINT_MODULE_USAGE_PARAMS_I2C_SPI_DRIVER(true, false);
-	PRINT_MODULE_USAGE_PARAMS_I2C_ADDRESS(0x21);
-	PRINT_MODULE_USAGE_PARAM_FLAG('k', "if initialization (probing) fails, keep retrying periodically", true);
+	PRINT_MODULE_USAGE_PARAMS_I2C_SPI_DRIVER(true, true);
+	PRINT_MODULE_USAGE_PARAMS_I2C_ADDRESS(0x5D);
 	PRINT_MODULE_USAGE_DEFAULT_COMMANDS();
 }
 
-int
-sdp3x_airspeed_main(int argc, char *argv[])
+I2CSPIDriverBase *LPS33HW::instantiate(const BusCLIArguments &cli, const BusInstanceIterator &iterator,
+				       int runtime_instance)
 {
-	int ch;
-	using ThisDriver = SDP3X;
-	BusCLIArguments cli{true, false};
-	cli.default_i2c_frequency = 100000;
-	cli.i2c_address = I2C_ADDRESS_1_SDP3X;
+	device::Device *interface = nullptr;
 
-	while ((ch = cli.getopt(argc, argv, "k")) != EOF) {
-		switch (ch) {
-		case 'k': // keep retrying
-			cli.custom1 = 1;
-			break;
-		}
+	if (iterator.busType() == BOARD_I2C_BUS) {
+		interface = LPS33HW_I2C_interface(iterator.bus(), cli.i2c_address, cli.bus_frequency);
+
+	} else if (iterator.busType() == BOARD_SPI_BUS) {
+		interface = LPS33HW_SPI_interface(iterator.bus(), iterator.devid(), cli.bus_frequency, cli.spi_mode);
 	}
 
-	const char *verb = cli.optarg();
+	if (interface == nullptr) {
+		PX4_ERR("failed creating interface for bus %i (devid 0x%x)", iterator.bus(), iterator.devid());
+		return nullptr;
+	}
+
+	if (interface->init() != OK) {
+		delete interface;
+		PX4_DEBUG("no device on bus %i (devid 0x%x)", iterator.bus(), iterator.devid());
+		return nullptr;
+	}
+
+	LPS33HW *dev = new LPS33HW(iterator.configuredBusOption(), iterator.bus(), interface);
+
+	if (dev == nullptr) {
+		delete interface;
+		return nullptr;
+	}
+
+	if (OK != dev->init()) {
+		delete dev;
+		return nullptr;
+	}
+
+	return dev;
+}
+
+extern "C" int lps33hw_main(int argc, char *argv[])
+{
+	using ThisDriver = LPS33HW;
+	BusCLIArguments cli{true, true};
+	cli.i2c_address = 0x5D;
+	cli.default_i2c_frequency = 400000;
+	cli.default_spi_frequency = 10 * 1000 * 1000;
+
+	const char *verb = cli.parseDefaultArguments(argc, argv);
 
 	if (!verb) {
 		ThisDriver::print_usage();
 		return -1;
 	}
 
-	BusInstanceIterator iterator(MODULE_NAME, cli, DRV_DIFF_PRESS_DEVTYPE_SDP31);
+	BusInstanceIterator iterator(MODULE_NAME, cli, DRV_BARO_DEVTYPE_LPS33HW);
 
 	if (!strcmp(verb, "start")) {
 		return ThisDriver::module_start(cli, iterator);

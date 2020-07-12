@@ -32,75 +32,60 @@
  ****************************************************************************/
 
 /**
- * @file ICM20948_AK09916.hpp
+ * @file lps33hw_i2c.cpp
  *
- * Driver for the AKM AK09916 connected via I2C.
- *
+ * I2C interface for LPS33HW
  */
 
-#pragma once
-
-#include "AKM_AK09916_registers.hpp"
-
-#include <drivers/drv_hrt.h>
 #include <lib/drivers/device/i2c.h>
-#include <lib/drivers/magnetometer/PX4Magnetometer.hpp>
-#include <lib/perf/perf_counter.h>
-#include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
 
-class ICM20948;
-
-namespace AKM_AK09916
+namespace lps33hw
 {
 
-class ICM20948_AK09916 : public px4::ScheduledWorkItem
+device::Device *LPS33HW_I2C_interface(uint8_t bus, uint32_t address, int bus_frequency);
+
+class LPS33HW_I2C : public device::I2C
 {
 public:
-	ICM20948_AK09916(ICM20948 &icm20948, enum Rotation rotation = ROTATION_NONE);
-	~ICM20948_AK09916() override;
+	LPS33HW_I2C(uint8_t bus, uint32_t address, int bus_frequency);
+	virtual ~LPS33HW_I2C() = default;
 
-	bool Reset();
-	void PrintInfo();
+	virtual int	read(unsigned address, void *data, unsigned count);
+	virtual int	write(unsigned address, void *data, unsigned count);
 
-private:
-
-	struct TransferBuffer {
-		uint8_t ST1;
-		uint8_t HXL;
-		uint8_t HXH;
-		uint8_t HYL;
-		uint8_t HYH;
-		uint8_t HZL;
-		uint8_t HZH;
-		uint8_t TMPS;
-		uint8_t ST2;
-	};
-
-	struct register_config_t {
-		AKM_AK09916::Register reg;
-		uint8_t set_bits{0};
-		uint8_t clear_bits{0};
-	};
-
-	void Run() override;
-
-	ICM20948 &_icm20948;
-
-	PX4Magnetometer _px4_mag;
-
-	perf_counter_t _bad_transfer_perf{perf_alloc(PC_COUNT, MODULE_NAME"_ak09916: bad transfer")};
-	perf_counter_t _magnetic_sensor_overflow_perf{perf_alloc(PC_COUNT, MODULE_NAME"_ak09916: magnetic sensor overflow")};
-
-	hrt_abstime _reset_timestamp{0};
-	hrt_abstime _last_config_check_timestamp{0};
-	unsigned _consecutive_failures{0};
-
-	enum class STATE : uint8_t {
-		RESET,
-		READ_WHO_AM_I,
-		WAIT_FOR_RESET,
-		READ,
-	} _state{STATE::RESET};
 };
 
-} // namespace AKM_AK09916
+device::Device *
+LPS33HW_I2C_interface(uint8_t bus, uint32_t address, int bus_frequency)
+{
+	return new LPS33HW_I2C(bus, address, bus_frequency);
+}
+
+LPS33HW_I2C::LPS33HW_I2C(uint8_t bus, uint32_t address, int bus_frequency) :
+	I2C(DRV_BARO_DEVTYPE_LPS33HW, MODULE_NAME, bus, address, bus_frequency)
+{
+}
+
+int
+LPS33HW_I2C::read(unsigned address, void *data, unsigned count)
+{
+	uint8_t cmd = address;
+	return transfer(&cmd, 1, (uint8_t *)data, count);
+}
+
+int
+LPS33HW_I2C::write(unsigned address, void *data, unsigned count)
+{
+	uint8_t buf[32];
+
+	if (sizeof(buf) < (count + 1)) {
+		return -EIO;
+	}
+
+	buf[0] = address;
+	memcpy(&buf[1], data, count);
+
+	return transfer(&buf[0], count + 1, nullptr, 0);
+}
+
+} // namespace lps33hw

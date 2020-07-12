@@ -36,6 +36,9 @@
 #include <px4_platform_common/log.h>
 #include <lib/ecl/geo/geo.h>
 
+namespace sensors
+{
+
 using namespace matrix;
 using namespace time_literals;
 
@@ -51,14 +54,12 @@ VehicleAirData::VehicleAirData() :
 VehicleAirData::~VehicleAirData()
 {
 	Stop();
-
 	perf_free(_cycle_perf);
 }
 
 bool VehicleAirData::Start()
 {
 	ScheduleNow();
-
 	return true;
 }
 
@@ -122,6 +123,8 @@ void VehicleAirData::Run()
 {
 	perf_begin(_cycle_perf);
 
+	ParametersUpdate();
+
 	SensorCorrectionsUpdate();
 
 	bool updated[MAX_SENSOR_COUNT] {};
@@ -135,7 +138,7 @@ void VehicleAirData::Run()
 					if (uorb_index > 0) {
 						/* the first always exists, but for each further sensor, add a new validator */
 						if (!_voter.add_new_validator()) {
-							PX4_ERR("failed to add validator for sensor_baro:%i", uorb_index);
+							PX4_ERR("failed to add validator for %s %i", "BARO", uorb_index);
 						}
 					}
 
@@ -182,13 +185,18 @@ void VehicleAirData::Run()
 				sub.unregisterCallback();
 			}
 
+			if (_selected_sensor_sub_index >= 0) {
+				PX4_INFO("%s switch from #%u -> #%d", "BARO", _selected_sensor_sub_index, best_index);
+			}
+
 			_selected_sensor_sub_index = best_index;
 			_sensor_sub[_selected_sensor_sub_index].registerCallback();
 		}
 	}
 
-	if ((_selected_sensor_sub_index >= 0) && updated[_selected_sensor_sub_index]) {
-		ParametersUpdate();
+	if ((_selected_sensor_sub_index >= 0)
+	    && (_voter.get_sensor_state(_selected_sensor_sub_index) == DataValidator::ERROR_FLAG_NO_ERROR)
+	    && updated[_selected_sensor_sub_index]) {
 
 		const sensor_baro_s &baro = _last_data[_selected_sensor_sub_index];
 
@@ -239,18 +247,13 @@ void VehicleAirData::Run()
 		uint32_t flags = _voter.failover_state();
 		int failover_index = _voter.failover_index();
 
-		if (flags == DataValidator::ERROR_FLAG_NO_ERROR) {
-			if (failover_index != -1) {
-				// we switched due to a non-critical reason. No need to panic.
-				PX4_INFO("sensor_baro switch from #%i", failover_index);
-			}
-
-		} else {
+		if (flags != DataValidator::ERROR_FLAG_NO_ERROR) {
 			if (failover_index != -1) {
 				const hrt_abstime now = hrt_absolute_time();
 
 				if (now - _last_error_message > 3_s) {
-					mavlink_log_emergency(&_mavlink_log_pub, "sensor_baro:#%i failed: %s%s%s%s%s!, reconfiguring priorities",
+					mavlink_log_emergency(&_mavlink_log_pub, "%s #%i failed: %s%s%s%s%s!",
+							      "BARO",
 							      failover_index,
 							      ((flags & DataValidator::ERROR_FLAG_NO_DATA) ? " OFF" : ""),
 							      ((flags & DataValidator::ERROR_FLAG_STALE_DATA) ? " STALE" : ""),
@@ -264,6 +267,8 @@ void VehicleAirData::Run()
 				_priority[failover_index] = ORB_PRIO_MIN;
 			}
 		}
+
+		_last_failover_count = _voter.failover_count();
 	}
 
 	// reschedule timeout
@@ -285,3 +290,5 @@ void VehicleAirData::PrintStatus()
 
 	_voter.print();
 }
+
+}; // namespace sensors

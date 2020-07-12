@@ -31,76 +31,61 @@
  *
  ****************************************************************************/
 
-/**
- * @file ICM20948_AK09916.hpp
- *
- * Driver for the AKM AK09916 connected via I2C.
- *
- */
-
 #pragma once
 
-#include "AKM_AK09916_registers.hpp"
+// TODO: move to a central header
+static constexpr uint8_t Bit0 = (1 << 0);
+static constexpr uint8_t Bit1 = (1 << 1);
+static constexpr uint8_t Bit2 = (1 << 2);
+static constexpr uint8_t Bit3 = (1 << 3);
+static constexpr uint8_t Bit4 = (1 << 4);
+static constexpr uint8_t Bit5 = (1 << 5);
+static constexpr uint8_t Bit6 = (1 << 6);
+static constexpr uint8_t Bit7 = (1 << 7);
 
-#include <drivers/drv_hrt.h>
-#include <lib/drivers/device/i2c.h>
-#include <lib/drivers/magnetometer/PX4Magnetometer.hpp>
-#include <lib/perf/perf_counter.h>
-#include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
-
-class ICM20948;
-
-namespace AKM_AK09916
+namespace ST_LPS33HW
 {
 
-class ICM20948_AK09916 : public px4::ScheduledWorkItem
-{
-public:
-	ICM20948_AK09916(ICM20948 &icm20948, enum Rotation rotation = ROTATION_NONE);
-	~ICM20948_AK09916() override;
+static constexpr uint8_t WHO_AM_I_VALUE = 0b10110001;
 
-	bool Reset();
-	void PrintInfo();
+enum class
+Register : uint8_t {
 
-private:
+	WHO_AM_I    = 0x0F,
+	CTRL_REG1   = 0x10,
+	CTRL_REG2   = 0x11,
+	CTRL_REG3   = 0x12,
 
-	struct TransferBuffer {
-		uint8_t ST1;
-		uint8_t HXL;
-		uint8_t HXH;
-		uint8_t HYL;
-		uint8_t HYH;
-		uint8_t HZL;
-		uint8_t HZH;
-		uint8_t TMPS;
-		uint8_t ST2;
-	};
+	REF_P_XL    = 0x15,
+	REF_P_L     = 0x16,
+	REF_P_H     = 0x17,
 
-	struct register_config_t {
-		AKM_AK09916::Register reg;
-		uint8_t set_bits{0};
-		uint8_t clear_bits{0};
-	};
+	RPDS_L      = 0x18,
+	RPDS_H      = 0x19,
 
-	void Run() override;
+	RES_CONF    = 0x1A,
 
-	ICM20948 &_icm20948;
-
-	PX4Magnetometer _px4_mag;
-
-	perf_counter_t _bad_transfer_perf{perf_alloc(PC_COUNT, MODULE_NAME"_ak09916: bad transfer")};
-	perf_counter_t _magnetic_sensor_overflow_perf{perf_alloc(PC_COUNT, MODULE_NAME"_ak09916: magnetic sensor overflow")};
-
-	hrt_abstime _reset_timestamp{0};
-	hrt_abstime _last_config_check_timestamp{0};
-	unsigned _consecutive_failures{0};
-
-	enum class STATE : uint8_t {
-		RESET,
-		READ_WHO_AM_I,
-		WAIT_FOR_RESET,
-		READ,
-	} _state{STATE::RESET};
+	STATUS      = 0x27,
+	PRESS_OUT_XL = 0x28,
+	PRESS_OUT_L = 0x29,
+	PRESS_OUT_H = 0x2A,
+	TEMP_OUT_L  = 0x2B,
+	TEMP_OUT_H  = 0x2C,
 };
 
-} // namespace AKM_AK09916
+enum CTRL_REG1 : uint8_t {
+	ODR_75HZ = Bit4 | Bit6, // Continous 75Hz update rate
+	EN_LPFP = Bit3, // enable low-pass filter
+	BDU = Bit1, // block data update
+};
+
+enum CTRL_REG2 : uint8_t {
+	SWRESET = Bit2,
+};
+
+enum STATUS : uint8_t {
+	P_DA = Bit0, // Pressure data available
+	T_DA = Bit1, // Temp data available
+};
+
+} // namespace ST_LPS33HW

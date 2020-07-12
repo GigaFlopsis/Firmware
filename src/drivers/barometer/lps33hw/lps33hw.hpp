@@ -32,75 +32,57 @@
  ****************************************************************************/
 
 /**
- * @file ICM20948_AK09916.hpp
+ * @file lps33hw.hpp
  *
- * Driver for the AKM AK09916 connected via I2C.
- *
+ * Driver for the Infineon LPS33HW barometer connected via I2C or SPI.
  */
 
 #pragma once
 
-#include "AKM_AK09916_registers.hpp"
-
-#include <drivers/drv_hrt.h>
-#include <lib/drivers/device/i2c.h>
-#include <lib/drivers/magnetometer/PX4Magnetometer.hpp>
+#include <drivers/device/Device.hpp>
+#include <lib/drivers/barometer/PX4Barometer.hpp>
 #include <lib/perf/perf_counter.h>
 #include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
+#include <px4_platform_common/i2c_spi_buses.h>
 
-class ICM20948;
+#include "lps33hw_registers.hpp"
 
-namespace AKM_AK09916
+namespace lps33hw
 {
 
-class ICM20948_AK09916 : public px4::ScheduledWorkItem
+using ST_LPS33HW::Register;
+
+class LPS33HW : public I2CSPIDriver<LPS33HW>
 {
 public:
-	ICM20948_AK09916(ICM20948 &icm20948, enum Rotation rotation = ROTATION_NONE);
-	~ICM20948_AK09916() override;
+	LPS33HW(I2CSPIBusOption bus_option, int bus, device::Device *interface);
+	virtual ~LPS33HW();
 
-	bool Reset();
-	void PrintInfo();
+	static I2CSPIDriverBase *instantiate(const BusCLIArguments &cli, const BusInstanceIterator &iterator,
+					     int runtime_instance);
+	static void print_usage();
+
+	int			init();
+
+	void			print_status();
+	void			RunImpl();
 
 private:
 
-	struct TransferBuffer {
-		uint8_t ST1;
-		uint8_t HXL;
-		uint8_t HXH;
-		uint8_t HYL;
-		uint8_t HYH;
-		uint8_t HZL;
-		uint8_t HZH;
-		uint8_t TMPS;
-		uint8_t ST2;
-	};
+	void			start();
+	int			reset();
 
-	struct register_config_t {
-		AKM_AK09916::Register reg;
-		uint8_t set_bits{0};
-		uint8_t clear_bits{0};
-	};
+	int			RegisterRead(Register reg, uint8_t &val);
+	int			RegisterWrite(Register reg, uint8_t val);
 
-	void Run() override;
+	static constexpr uint32_t SAMPLE_RATE{75};
 
-	ICM20948 &_icm20948;
+	PX4Barometer		_px4_barometer;
 
-	PX4Magnetometer _px4_mag;
+	device::Device		*_interface;
 
-	perf_counter_t _bad_transfer_perf{perf_alloc(PC_COUNT, MODULE_NAME"_ak09916: bad transfer")};
-	perf_counter_t _magnetic_sensor_overflow_perf{perf_alloc(PC_COUNT, MODULE_NAME"_ak09916: magnetic sensor overflow")};
-
-	hrt_abstime _reset_timestamp{0};
-	hrt_abstime _last_config_check_timestamp{0};
-	unsigned _consecutive_failures{0};
-
-	enum class STATE : uint8_t {
-		RESET,
-		READ_WHO_AM_I,
-		WAIT_FOR_RESET,
-		READ,
-	} _state{STATE::RESET};
+	perf_counter_t		_sample_perf;
+	perf_counter_t		_comms_errors;
 };
 
-} // namespace AKM_AK09916
+} // namespace lps33hw
